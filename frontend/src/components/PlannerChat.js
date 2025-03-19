@@ -40,6 +40,12 @@ function PlannerChat() {
     }]);
   };
 
+  const shouldGenerateInvitation = (text) => {
+    const keywords = ['invitation', 'invite', 'i wish to receive the invitation', 'generate invitation', 'create invitation'];
+    text = text.toLowerCase();
+    return keywords.some(keyword => text.includes(keyword));
+  };
+
   const getAIResponse = async (userInput) => {
     setLoading(true);
     
@@ -56,15 +62,11 @@ function PlannerChat() {
         content: userInput
       });
       
-      // Check for special keywords
-      const input = userInput.toLowerCase();
+      // Check if this is an invitation request
+      const generateInvite = shouldGenerateInvitation(userInput);
       
-      let endpoint = '/api/chat';
-      if (input.includes('invitation') || input.includes('invite')) {
-        endpoint = '/api/generate-invitation';
-      }
-      
-      console.log(`Sending request to ${endpoint}`);
+      let endpoint = generateInvite ? '/api/generate-invitation' : '/api/chat';
+      console.log(`Sending request to ${endpoint}`, generateInvite ? 'Generating invitation' : 'Regular chat');
       
       // Send request to backend
       const response = await fetch(endpoint, {
@@ -82,11 +84,20 @@ function PlannerChat() {
       const data = await response.json();
       console.log('Response data:', data);
       
-      // Handle different response types
-      if (endpoint === '/api/generate-invitation' && data.imageUrl) {
-        addMessage('Here\'s your invitation design:');
-        addMessage(`<img src="${data.imageUrl}" alt="Invitation" /><br>${data.invitationText}`);
+      // Handle invitation response
+      if (generateInvite && data.imageUrl) {
+        addMessage('Here\'s the digital invitation I\'ve created based on our conversation:');
+        
+        // Create a message with the image
+        const imageMessage = `<div class="invitation-container">
+          <img src="${data.imageUrl}" alt="Birthday Invitation" class="invitation-image"/>
+          <div class="invitation-text">${data.invitationText || 'Join us for a special celebration!'}</div>
+        </div>`;
+        
+        addMessage(imageMessage);
+        addMessage('How does this invitation look? Would you like me to make any changes?');
       } else {
+        // Regular chat response
         addMessage(data.response || 'I\'m thinking about how to help with your party!');
       }
     } catch (error) {
