@@ -64,6 +64,8 @@ function PlannerChat() {
         endpoint = '/api/generate-invitation';
       }
       
+      console.log(`Sending request to ${endpoint}`);
+      
       // Send request to backend
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -74,17 +76,18 @@ function PlannerChat() {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to get response');
+        throw new Error(`Server responded with status: ${response.status}`);
       }
       
       const data = await response.json();
+      console.log('Response data:', data);
       
       // Handle different response types
       if (endpoint === '/api/generate-invitation' && data.imageUrl) {
         addMessage('Here\'s your invitation design:');
         addMessage(`<img src="${data.imageUrl}" alt="Invitation" /><br>${data.invitationText}`);
       } else {
-        addMessage(data.response || data.text || 'I\'m thinking about how to help with your party!');
+        addMessage(data.response || 'I\'m thinking about how to help with your party!');
       }
     } catch (error) {
       console.error('Error getting AI response:', error);

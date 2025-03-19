@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
 require('dotenv').config();
 
@@ -9,16 +8,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Initialize AI clients
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY
-});
-
+// Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY || 'dummy-key'
 });
 
-// The party planning system prompt - this is where the intelligence happens
+// The party planning system prompt
 const SYSTEM_PROMPT = `You are PartyPilot, an expert event planner AI specializing in birthday celebrations. Your goal is to help users create unforgettable birthday experiences through natural conversation.
 
 APPROACH:
@@ -51,28 +46,42 @@ PLAN 1: [THEME NAME] - [BRIEF DESCRIPTION]
 
 If the user asks about invitations, offer to design a digital invitation and get details about the style they prefer.`;
 
-// API endpoint for chatting with Anthropic
+// API endpoint for chatting with OpenAI
 app.post('/api/chat', async (req, res) => {
   try {
     const { messages } = req.body;
     
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return res.status(500).json({ error: 'Anthropic API key is not configured' });
+    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
+      console.log('Warning: Using OpenAI API without proper key configuration');
+      return res.status(500).json({ 
+        error: 'OpenAI API key is not configured',
+        response: 'Sorry, I encountered a problem. The AI service is not properly configured.' 
+      });
     }
     
-    const response = await anthropic.messages.create({
-      model: "claude-3-opus-20240229",
-      system: SYSTEM_PROMPT,
-      messages: messages,
+    console.log('Sending request to OpenAI with', messages.length, 'messages');
+    
+    // Format messages for OpenAI
+    const formattedMessages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...messages
+    ];
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4-turbo",
+      messages: formattedMessages,
       max_tokens: 2000,
       temperature: 0.7
     });
     
-    res.json({ response: response.content[0].text });
+    res.json({ response: response.choices[0].message.content });
     
   } catch (error) {
-    console.error('Anthropic API error:', error);
-    res.status(500).json({ error: 'Failed to get a response' });
+    console.error('OpenAI API error:', error);
+    res.status(500).json({ 
+      error: 'Failed to get a response',
+      response: 'Sorry, I encountered a problem. Please try again.' 
+    });
   }
 });
 
@@ -81,24 +90,30 @@ app.post('/api/generate-invitation', async (req, res) => {
   try {
     const { messages } = req.body;
     
-    if (!process.env.ANTHROPIC_API_KEY || !process.env.OPENAI_API_KEY) {
-      return res.status(500).json({ error: 'API keys are not configured' });
+    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
+      return res.status(500).json({ 
+        error: 'OpenAI API key is not configured',
+        response: 'Sorry, I encountered a problem. The AI service is not properly configured.'
+      });
     }
     
-    // First, use Anthropic to generate invitation text and DALL-E prompt
+    // First, use OpenAI to generate invitation text and DALL-E prompt
     const invitationPrompt = "Based on our conversation about the birthday party, create: 1) Invitation text with placeholders for date, time, and RSVP info, and 2) A detailed prompt for DALL-E to generate a beautiful invitation background image that matches the theme. Be visually descriptive in the DALL-E prompt.";
     
-    const anthropicResponse = await anthropic.messages.create({
-      model: "claude-3-opus-20240229",
-      messages: [
-        ...messages,
-        { role: "user", content: invitationPrompt }
-      ],
+    const formattedMessages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...messages,
+      { role: "user", content: invitationPrompt }
+    ];
+    
+    const textResponse = await openai.chat.completions.create({
+      model: "gpt-4-turbo",
+      messages: formattedMessages,
       max_tokens: 1000,
       temperature: 0.7
     });
     
-    const responseText = anthropicResponse.content[0].text;
+    const responseText = textResponse.choices[0].message.content;
     
     // Extract invitation text and DALL-E prompt
     let invitationText = "Join us for a special celebration!";
@@ -133,7 +148,10 @@ app.post('/api/generate-invitation', async (req, res) => {
     
   } catch (error) {
     console.error('Invitation generation error:', error);
-    res.status(500).json({ error: 'Failed to generate invitation' });
+    res.status(500).json({ 
+      error: 'Failed to generate invitation',
+      response: 'Sorry, I encountered a problem generating your invitation.'
+    });
   }
 });
 
